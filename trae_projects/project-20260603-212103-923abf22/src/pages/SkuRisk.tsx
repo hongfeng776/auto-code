@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Package,
@@ -10,6 +10,7 @@ import {
   Zap,
   AlertCircle,
   CheckCircle2,
+  ShoppingCart,
 } from 'lucide-react'
 import { useInventoryStore } from '@/store/useInventoryStore'
 import type { SkuItem } from '@/types'
@@ -117,6 +118,21 @@ function StockProgressBar({ current, safety }: { current: number; safety: number
 }
 
 function SkuCard({ sku, hasSupplier }: { sku: SkuItem; hasSupplier: boolean }) {
+  const navigate = useNavigate()
+  const setSelectedSkuId = useInventoryStore((s) => s.setSelectedSkuId)
+  const selectedSkuId = useInventoryStore((s) => s.selectedSkuId)
+  const getSuggestionsBySku = useInventoryStore((s) => s.getSuggestionsBySku)
+
+  const isSelected = selectedSkuId === sku.id
+  const suggestions = getSuggestionsBySku(sku.id)
+  const hasSuggestion = suggestions.length > 0
+
+  const handleViewReplenishment = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedSkuId(sku.id, 'sku-risk')
+    navigate('/replenishment')
+  }
+
   const riskBorder =
     sku.riskLevel === 'out_of_stock'
       ? 'border-l-red-500'
@@ -133,14 +149,28 @@ function SkuCard({ sku, hasSupplier }: { sku: SkuItem; hasSupplier: boolean }) {
 
   return (
     <div
-      className={`bg-dark-700 border border-dark-500 border-l-4 ${riskBorder} rounded-lg p-4 transition-all duration-200 hover:bg-dark-600 hover:shadow-lg ${riskGlow} slide-in`}
+      data-sku-id={sku.id}
+      onClick={handleViewReplenishment}
+      className={`bg-dark-700 border border-dark-500 border-l-4 ${riskBorder} rounded-lg p-4 transition-all duration-200 hover:bg-dark-600 hover:shadow-lg ${riskGlow} slide-in cursor-pointer group ${
+        isSelected ? 'ring-2 ring-amber-500/50 bg-dark-600' : ''
+      }`}
     >
       <div className="flex items-start justify-between mb-2">
         <div>
           <span className="text-xs text-gray-500 font-mono">{sku.skuCode}</span>
-          <h4 className="text-sm font-semibold text-gray-100 mt-0.5">{sku.name}</h4>
+          <h4 className="text-sm font-semibold text-gray-100 mt-0.5 group-hover:text-amber-400 transition-colors">
+            {sku.name}
+          </h4>
         </div>
-        <span className="text-xs px-2 py-0.5 rounded bg-dark-500 text-gray-400">{sku.category}</span>
+        <div className="flex items-center gap-2">
+          {hasSuggestion && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+              <ShoppingCart className="w-3 h-3" />
+              {suggestions.length} 条建议
+            </span>
+          )}
+          <span className="text-xs px-2 py-0.5 rounded bg-dark-500 text-gray-400">{sku.category}</span>
+        </div>
       </div>
 
       <div className="mt-3">
@@ -180,14 +210,16 @@ function SkuCard({ sku, hasSupplier }: { sku: SkuItem; hasSupplier: boolean }) {
 
       <ProcessingLogic sku={sku} hasSupplier={hasSupplier} />
 
-      <div className="mt-3 pt-3 border-t border-dark-500">
-        <Link
-          to="/replenishment"
+      <div className="mt-3 pt-3 border-t border-dark-500 flex items-center justify-between">
+        <span className="text-[10px] text-gray-500">点击卡片查看补货方案 →</span>
+        <button
+          onClick={handleViewReplenishment}
           className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-medium transition-colors"
         >
-          查看补货方案
+          <ShoppingCart className="w-3.5 h-3.5" />
+          关联补货
           <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
+        </button>
       </div>
     </div>
   )
@@ -237,15 +269,43 @@ function RiskColumn({
 }
 
 export default function SkuRisk() {
+  const navigate = useNavigate()
   const {
     warehouses,
     skuItems,
     suppliers,
     selectedWarehouse,
     selectedSkuRiskFilter,
+    selectedSkuId,
+    lastLinkedFrom,
     setSelectedWarehouse,
     setSelectedSkuRiskFilter,
+    setSelectedSkuId,
+    getSkuById,
   } = useInventoryStore()
+
+  const linkedSku = selectedSkuId ? getSkuById(selectedSkuId) : null
+  const hasLinkedSku = selectedSkuId && lastLinkedFrom === 'replenishment'
+
+  useEffect(() => {
+    if (hasLinkedSku) {
+      const timer = setTimeout(() => {
+        const element = document.querySelector(`[data-sku-id="${selectedSkuId}"]`)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [hasLinkedSku, selectedSkuId])
+
+  const handleClearSelection = () => {
+    setSelectedSkuId(null, null)
+  }
+
+  const handleBackToReplenishment = () => {
+    navigate('/replenishment')
+  }
 
   const filteredSkus = useMemo(() => {
     let result = skuItems
@@ -293,6 +353,39 @@ export default function SkuRisk() {
         </div>
         <p className="text-sm text-gray-500 ml-9">按风险等级查看 SKU 库存状况与处理流程</p>
       </div>
+
+      {hasLinkedSku && linkedSku && (
+        <div className="mb-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center animate-pulse">
+              <Zap className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-amber-300">
+                从补货建议页联动跳转
+              </div>
+              <div className="text-xs text-amber-400/70">
+                已定位到 <span className="font-semibold text-amber-300">{linkedSku.name}</span> ({linkedSku.skuCode})
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBackToReplenishment}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-dark-600 text-gray-300 border border-dark-500 hover:bg-dark-500 hover:text-gray-100 transition-colors"
+            >
+              <ArrowRight className="w-3.5 h-3.5" />
+              返回补货建议
+            </button>
+            <button
+              onClick={handleClearSelection}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-dark-600 text-gray-400 border border-dark-500 hover:bg-dark-500 hover:text-gray-200 transition-colors"
+            >
+              清除选中
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-4 mb-6 bg-dark-700 rounded-lg p-4 border border-dark-500">
         <div className="flex items-center gap-2">

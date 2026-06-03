@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useMemo, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Package,
   AlertTriangle,
@@ -9,6 +9,8 @@ import {
   UserX,
   ShoppingCart,
   Filter,
+  ArrowLeft,
+  Zap,
 } from 'lucide-react'
 import { useInventoryStore } from '@/store/useInventoryStore'
 import type { ReplenishmentSuggestion } from '@/types'
@@ -132,15 +134,29 @@ function SupplierStatusSection({ suggestion }: { suggestion: ReplenishmentSugges
 }
 
 function SuggestionCard({ suggestion }: { suggestion: ReplenishmentSuggestion }) {
+  const navigate = useNavigate()
   const getSkuById = useInventoryStore((s) => s.getSkuById)
   const getWarehouseById = useInventoryStore((s) => s.getWarehouseById)
+  const selectedSkuId = useInventoryStore((s) => s.selectedSkuId)
+  const lastLinkedFrom = useInventoryStore((s) => s.lastLinkedFrom)
+  const setSelectedSkuId = useInventoryStore((s) => s.setSelectedSkuId)
 
   const sku = getSkuById(suggestion.skuId)
   const warehouse = getWarehouseById(suggestion.warehouseId)
+  const isHighlighted = selectedSkuId === suggestion.skuId && lastLinkedFrom === 'sku-risk'
+
+  const handleViewSkuRisk = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedSkuId(suggestion.skuId, 'replenishment')
+    navigate('/sku-risk')
+  }
 
   return (
     <div
-      className={`bg-dark-700 border border-dark-500 border-l-4 ${priorityColorMap[suggestion.priority]} rounded-lg p-4 transition-all duration-200 hover:bg-dark-600 hover:shadow-lg slide-in`}
+      data-sku-id={suggestion.skuId}
+      className={`bg-dark-700 border border-dark-500 border-l-4 ${priorityColorMap[suggestion.priority]} rounded-lg p-4 transition-all duration-200 hover:bg-dark-600 hover:shadow-lg slide-in ${
+        isHighlighted ? 'ring-2 ring-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.25)] scale-[1.01]' : ''
+      }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -150,6 +166,12 @@ function SuggestionCard({ suggestion }: { suggestion: ReplenishmentSuggestion })
             </span>
             <span className="text-sm font-semibold text-gray-100">{sku?.name ?? suggestion.skuId}</span>
             <span className="text-xs text-gray-500 font-mono">{sku?.skuCode}</span>
+            {isHighlighted && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                <Zap className="w-3 h-3" />
+                关联选中
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
@@ -174,12 +196,13 @@ function SuggestionCard({ suggestion }: { suggestion: ReplenishmentSuggestion })
       </div>
 
       <div className="mt-3 pt-3 border-t border-dark-500 flex items-center justify-between">
-        <Link
-          to="/sku-risk"
+        <button
+          onClick={handleViewSkuRisk}
           className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-medium transition-colors"
         >
+          <ArrowLeft className="w-3.5 h-3.5" />
           查看 SKU 风险详情
-        </Link>
+        </button>
         <span className="text-[10px] text-gray-600">
           状态: {suggestion.status === 'pending' ? '待处理' : suggestion.status === 'approved' ? '已审批' : suggestion.status === 'ordered' ? '已下单' : '已到货'}
         </span>
@@ -189,11 +212,39 @@ function SuggestionCard({ suggestion }: { suggestion: ReplenishmentSuggestion })
 }
 
 export default function Replenishment() {
+  const navigate = useNavigate()
   const suggestions = useInventoryStore((s) => s.suggestions)
   const updateSuggestionStatus = useInventoryStore((s) => s.updateSuggestionStatus)
+  const selectedSkuId = useInventoryStore((s) => s.selectedSkuId)
+  const lastLinkedFrom = useInventoryStore((s) => s.lastLinkedFrom)
+  const setSelectedSkuId = useInventoryStore((s) => s.setSelectedSkuId)
+  const getSkuById = useInventoryStore((s) => s.getSkuById)
 
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  const linkedSku = selectedSkuId ? getSkuById(selectedSkuId) : null
+  const hasLinkedSuggestion = selectedSkuId && lastLinkedFrom === 'sku-risk'
+
+  useEffect(() => {
+    if (hasLinkedSuggestion) {
+      const timer = setTimeout(() => {
+        const element = document.querySelector(`[data-sku-id="${selectedSkuId}"]`)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [hasLinkedSuggestion, selectedSkuId])
+
+  const handleClearSelection = () => {
+    setSelectedSkuId(null, null)
+  }
+
+  const handleBackToSkuRisk = () => {
+    navigate('/sku-risk')
+  }
 
   const stats = useMemo(() => ({
     pending: suggestions.filter((s) => s.status === 'pending').length,
@@ -257,6 +308,39 @@ export default function Replenishment() {
         </div>
         <p className="text-sm text-gray-500 ml-9">管理库存补货建议与供应商协同</p>
       </div>
+
+      {hasLinkedSuggestion && linkedSku && (
+        <div className="mb-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center animate-pulse">
+              <Zap className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-amber-300">
+                从 SKU 风险页联动跳转
+              </div>
+              <div className="text-xs text-amber-400/70">
+                已定位到 <span className="font-semibold text-amber-300">{linkedSku.name}</span> ({linkedSku.skuCode}) 的补货建议
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBackToSkuRisk}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-dark-600 text-gray-300 border border-dark-500 hover:bg-dark-500 hover:text-gray-100 transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              返回 SKU 风险
+            </button>
+            <button
+              onClick={handleClearSelection}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-dark-600 text-gray-400 border border-dark-500 hover:bg-dark-500 hover:text-gray-200 transition-colors"
+            >
+              清除选中
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-dark-700 border border-dark-500 rounded-xl p-4">

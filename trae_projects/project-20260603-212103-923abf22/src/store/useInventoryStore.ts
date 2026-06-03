@@ -14,9 +14,12 @@ interface InventoryState {
   simulationRun: boolean
   selectedWarehouse: string | null
   selectedSkuRiskFilter: 'all' | 'out_of_stock' | 'low' | 'normal'
+  selectedSkuId: string | null
+  lastLinkedFrom: 'sku-risk' | 'replenishment' | null
 
   setSelectedWarehouse: (id: string | null) => void
   setSelectedSkuRiskFilter: (filter: 'all' | 'out_of_stock' | 'low' | 'normal') => void
+  setSelectedSkuId: (id: string | null, from?: 'sku-risk' | 'replenishment' | null) => void
   resolveAlert: (id: string) => void
   updateSuggestionStatus: (id: string, status: ReplenishmentSuggestion['status']) => void
   runSimulation: (params: SimulationParams) => void
@@ -26,6 +29,7 @@ interface InventoryState {
   getSkusByWarehouse: (warehouseId: string) => SkuItem[]
   getAlertsByWarehouse: (warehouseId: string) => AlertRecord[]
   getSuggestionsByWarehouse: (warehouseId: string) => ReplenishmentSuggestion[]
+  getSuggestionsBySku: (skuId: string) => ReplenishmentSuggestion[]
   getSkuRiskSummary: () => { outOfStock: number; low: number; normal: number }
   getUnresolvedAlerts: () => AlertRecord[]
   getCriticalAlerts: () => AlertRecord[]
@@ -50,9 +54,12 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   simulationRun: false,
   selectedWarehouse: null,
   selectedSkuRiskFilter: 'all',
+  selectedSkuId: null,
+  lastLinkedFrom: null,
 
   setSelectedWarehouse: (id) => set({ selectedWarehouse: id }),
   setSelectedSkuRiskFilter: (filter) => set({ selectedSkuRiskFilter: filter }),
+  setSelectedSkuId: (id, from = null) => set({ selectedSkuId: id, lastLinkedFrom: from }),
 
   resolveAlert: (id) =>
     set((state) => ({
@@ -158,6 +165,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   getSkusByWarehouse: (warehouseId) => get().skuItems.filter((s) => s.warehouseId === warehouseId),
   getAlertsByWarehouse: (warehouseId) => get().alerts.filter((a) => a.warehouseId === warehouseId),
   getSuggestionsByWarehouse: (warehouseId) => get().suggestions.filter((s) => s.warehouseId === warehouseId),
+  getSuggestionsBySku: (skuId) => get().suggestions.filter((s) => s.skuId === skuId),
 
   getSkuRiskSummary: () => {
     const skus = get().skuItems
