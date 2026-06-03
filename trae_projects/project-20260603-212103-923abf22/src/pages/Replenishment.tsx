@@ -7,10 +7,13 @@ import {
   Clock,
   Truck,
   UserX,
+  User,
   ShoppingCart,
   Filter,
   ArrowLeft,
   Zap,
+  MessageSquare,
+  Calendar,
 } from 'lucide-react'
 import { useInventoryStore } from '@/store/useInventoryStore'
 import type { ReplenishmentSuggestion } from '@/types'
@@ -80,27 +83,74 @@ function StatusActionButton({ suggestion }: { suggestion: ReplenishmentSuggestio
 
 function SupplierStatusSection({ suggestion }: { suggestion: ReplenishmentSuggestion }) {
   const getSupplierById = useInventoryStore((s) => s.getSupplierById)
+  const getCommunicationsBySupplier = useInventoryStore((s) => s.getCommunicationsBySupplier)
 
   if (suggestion.supplierAvailable && suggestion.supplierId) {
     const supplier = getSupplierById(suggestion.supplierId)
+    const communications = suggestion.supplierId ? getCommunicationsBySupplier(suggestion.supplierId) : []
+    const latestComm = communications[0]
+
     return (
-      <div className="flex items-center gap-3 flex-wrap mt-3 p-3 bg-dark-800/60 rounded-lg border border-dark-500/50">
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          {supplier?.name ?? suggestion.supplierId}
-        </span>
-        <span className="text-xs text-gray-400">
-          <Clock className="w-3 h-3 inline mr-1" />
-          平均交期 {supplier?.avgLeadTime ?? '-'} 天
-        </span>
-        <span className="text-xs text-gray-400">
-          准时率 {supplier ? `${(supplier.onTimeRate * 100).toFixed(0)}%` : '-'}
-        </span>
-        {suggestion.estimatedArrival && (
-          <span className="text-xs text-gray-400">
-            <Truck className="w-3 h-3 inline mr-1" />
-            预计到货 {suggestion.estimatedArrival}
+      <div className="mt-3">
+        <div className="flex items-center gap-3 flex-wrap p-3 bg-dark-800/60 rounded-lg border border-dark-500/50 mb-2">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            {supplier?.name ?? suggestion.supplierId}
           </span>
+          <span className="text-xs text-gray-400">
+            <Clock className="w-3 h-3 inline mr-1" />
+            平均交期 {supplier?.avgLeadTime ?? '-'} 天
+          </span>
+          <span className="text-xs text-gray-400">
+            准时率 {supplier ? `${(supplier.onTimeRate * 100).toFixed(0)}%` : '-'}
+          </span>
+          {suggestion.estimatedArrival && (
+            <span className="text-xs text-emerald-400">
+              <Truck className="w-3 h-3 inline mr-1" />
+              预计到货 {suggestion.estimatedArrival}
+            </span>
+          )}
+        </div>
+
+        {latestComm && (
+          <div className="p-3 bg-dark-800/40 rounded-lg border border-dark-500/30">
+            <div className="flex items-center gap-2 mb-1.5">
+              <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-xs font-medium text-gray-300">最近沟通</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                latestComm.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-400' :
+                latestComm.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
+                latestComm.status === 'escalated' ? 'bg-red-500/20 text-red-400' :
+                'bg-amber-500/20 text-amber-400'
+              }`}>
+                {latestComm.status === 'pending' ? '待处理' :
+                 latestComm.status === 'in_progress' ? '进行中' :
+                 latestComm.status === 'escalated' ? '已升级' : '已解决'}
+              </span>
+              <span className="text-[10px] text-gray-500 ml-auto">
+                {new Date(latestComm.lastFollowUp).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mb-1">{latestComm.title}</p>
+            <div className="flex items-center gap-3 text-[10px] text-gray-500">
+              <span className="flex items-center gap-1">
+                <User className="w-3 h-3" />
+                {latestComm.contactPerson}
+              </span>
+              {latestComm.expectedDeliveryDate && (
+                <span className="flex items-center gap-1 text-blue-400">
+                  <Calendar className="w-3 h-3" />
+                  预计 {latestComm.expectedDeliveryDate} 到货
+                </span>
+              )}
+              {latestComm.nextFollowUp && (
+                <span className="flex items-center gap-1 text-amber-400">
+                  <Clock className="w-3 h-3" />
+                  下次跟进 {new Date(latestComm.nextFollowUp).toLocaleDateString('zh-CN')}
+                </span>
+              )}
+            </div>
+          </div>
         )}
       </div>
     )

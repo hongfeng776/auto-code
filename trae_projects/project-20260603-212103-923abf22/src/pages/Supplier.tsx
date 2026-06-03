@@ -1,8 +1,92 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, Phone, Clock, CheckCircle2, XCircle, AlertTriangle, Search, UserX, Building2 } from 'lucide-react'
+import {
+  Users,
+  Phone,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Search,
+  UserX,
+  Building2,
+  MessageSquare,
+  Truck,
+  AlertCircle,
+  DollarSign,
+  Shield,
+  HelpCircle,
+  Calendar,
+  Package,
+  ChevronRight,
+  User,
+} from 'lucide-react'
 import { useInventoryStore } from '@/store/useInventoryStore'
-import type { Supplier, SkuItem } from '@/types'
+import type { Supplier, SkuItem, SupplierCommunication } from '@/types'
+
+function getTypeIcon(type: SupplierCommunication['type']) {
+  const icons = {
+    order_confirm: MessageSquare,
+    delivery_update: Truck,
+    delay_notice: AlertCircle,
+    price_adjust: DollarSign,
+    quality_issue: Shield,
+    general: HelpCircle,
+  }
+  return icons[type]
+}
+
+function getTypeColor(type: SupplierCommunication['type']) {
+  const colors = {
+    order_confirm: 'text-blue-400 bg-blue-500/15',
+    delivery_update: 'text-emerald-400 bg-emerald-500/15',
+    delay_notice: 'text-red-400 bg-red-500/15',
+    price_adjust: 'text-amber-400 bg-amber-500/15',
+    quality_issue: 'text-purple-400 bg-purple-500/15',
+    general: 'text-gray-400 bg-gray-500/15',
+  }
+  return colors[type]
+}
+
+function getStatusColor(status: SupplierCommunication['status']) {
+  const colors = {
+    pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    in_progress: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    escalated: 'bg-red-500/20 text-red-400 border-red-500/30',
+    resolved: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  }
+  return colors[status]
+}
+
+function getStatusLabel(status: SupplierCommunication['status']) {
+  const labels = {
+    pending: '待处理',
+    in_progress: '处理中',
+    escalated: '已升级',
+    resolved: '已解决',
+  }
+  return labels[status]
+}
+
+function getPriorityColor(priority: SupplierCommunication['priority']) {
+  const colors = {
+    low: 'bg-gray-500/20 text-gray-400',
+    medium: 'bg-blue-500/20 text-blue-400',
+    high: 'bg-amber-500/20 text-amber-400',
+    urgent: 'bg-red-500/20 text-red-400',
+  }
+  return colors[priority]
+}
+
+function getPriorityLabel(priority: SupplierCommunication['priority']) {
+  const labels = {
+    low: '低',
+    medium: '中',
+    high: '高',
+    urgent: '紧急',
+  }
+  return labels[priority]
+}
 
 function statusBadge(status: Supplier['status']) {
   const map = {
@@ -37,38 +121,134 @@ function riskBadge(level: SkuItem['riskLevel']) {
   return <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${s.cls}`}>{s.label}</span>
 }
 
-function SupplierDetail({ supplier, skuItems }: { supplier: Supplier; skuItems: SkuItem[] }) {
+function CommCard({ comm, supplierName }: { comm: SupplierCommunication; supplierName: string }) {
+  const TypeIcon = getTypeIcon(comm.type)
+  return (
+    <div className="bg-dark-700 border border-dark-500 rounded-xl p-4 hover:border-dark-400 transition-colors">
+      <div className="flex items-start gap-3 mb-3">
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${getTypeColor(comm.type)}`}>
+          <TypeIcon className="w-4.5 h-4.5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getStatusColor(comm.status)}`}>
+              {getStatusLabel(comm.status)}
+            </span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getPriorityColor(comm.priority)}`}>
+              {getPriorityLabel(comm.priority)}
+            </span>
+          </div>
+          <h4 className="text-sm font-medium text-gray-200 truncate">{comm.title}</h4>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <Building2 className="w-3.5 h-3.5 text-gray-500" />
+          <span className="truncate">{supplierName}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <Clock className="w-3.5 h-3.5 text-gray-500" />
+          <span>{new Date(comm.lastFollowUp).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+        {comm.expectedDeliveryDate && (
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <Calendar className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-amber-400">预计到货: {comm.expectedDeliveryDate}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SupplierDetail({ supplier, skuItems, communications }: { supplier: Supplier; skuItems: SkuItem[]; communications: SupplierCommunication[] }) {
   const coveredSkus = useMemo(
     () => skuItems.filter((s) => supplier.coveredSkuIds.includes(s.id)),
     [skuItems, supplier.coveredSkuIds]
   )
 
+  const upcomingFollowUps = useMemo(
+    () => communications.filter((c) => c.nextFollowUp && c.status !== 'resolved'),
+    [communications]
+  )
+
   return (
     <tr className="bg-dark-800/50">
-      <td colSpan={6} className="px-5 py-4">
+      <td colSpan={8} className="px-5 py-4">
         <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2">
-            <h4 className="text-xs font-semibold text-gray-300 mb-2 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-amber-400" />
-              覆盖SKU明细
-            </h4>
-            <div className="space-y-1.5">
-              {coveredSkus.length === 0 && (
-                <p className="text-xs text-gray-500">暂无覆盖SKU</p>
-              )}
-              {coveredSkus.map((sku) => (
-                <div
-                  key={sku.id}
-                  className="flex items-center gap-3 bg-dark-700 rounded px-3 py-2 text-xs"
-                >
-                  <span className="text-gray-400 font-mono">{sku.skuCode}</span>
-                  <span className="text-gray-200 flex-1 truncate">{sku.name}</span>
-                  <span className="text-gray-500">库存 {sku.currentStock}</span>
-                  {riskBadge(sku.riskLevel)}
-                </div>
-              ))}
+          <div className="col-span-2 space-y-4">
+            <div>
+              <h4 className="text-xs font-semibold text-gray-300 mb-2 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                覆盖SKU明细
+              </h4>
+              <div className="space-y-1.5">
+                {coveredSkus.length === 0 && (
+                  <p className="text-xs text-gray-500">暂无覆盖SKU</p>
+                )}
+                {coveredSkus.map((sku) => (
+                  <div
+                    key={sku.id}
+                    className="flex items-center gap-3 bg-dark-700 rounded px-3 py-2 text-xs"
+                  >
+                    <span className="text-gray-400 font-mono">{sku.skuCode}</span>
+                    <span className="text-gray-200 flex-1 truncate">{sku.name}</span>
+                    <span className="text-gray-500">库存 {sku.currentStock}</span>
+                    {riskBadge(sku.riskLevel)}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-semibold text-gray-300 mb-2 flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+                沟通记录时间线
+              </h4>
+              <div className="space-y-2">
+                {communications.length === 0 && (
+                  <p className="text-xs text-gray-500">暂无沟通记录</p>
+                )}
+                {communications.map((comm) => {
+                  const TypeIcon = getTypeIcon(comm.type)
+                  return (
+                    <div key={comm.id} className="bg-dark-700 rounded-lg p-3">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-7 h-7 rounded flex items-center justify-center shrink-0 ${getTypeColor(comm.type)}`}>
+                          <TypeIcon className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium text-gray-200">{comm.title}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getStatusColor(comm.status)}`}>
+                              {getStatusLabel(comm.status)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {comm.contactPerson}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {new Date(comm.timestamp).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {comm.expectedDeliveryDate && (
+                              <span className="flex items-center gap-1 text-amber-400">
+                                <Calendar className="w-3 h-3" />
+                                预计到货: {comm.expectedDeliveryDate}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
+
           <div className="space-y-3">
             <div>
               <h4 className="text-xs font-semibold text-gray-300 mb-2">绩效指标</h4>
@@ -93,6 +273,7 @@ function SupplierDetail({ supplier, skuItems }: { supplier: Supplier; skuItems: 
                 </div>
               </div>
             </div>
+
             <div>
               <h4 className="text-xs font-semibold text-gray-300 mb-2">联系方式</h4>
               <div className="space-y-2">
@@ -122,6 +303,26 @@ function SupplierDetail({ supplier, skuItems }: { supplier: Supplier; skuItems: 
                 </div>
               </div>
             </div>
+
+            {upcomingFollowUps.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-gray-300 mb-2 flex items-center gap-1.5">
+                  <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
+                  待跟进事项
+                </h4>
+                <div className="space-y-2">
+                  {upcomingFollowUps.map((comm) => (
+                    <div key={comm.id} className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">
+                      <div className="text-xs font-medium text-amber-400 mb-0.5">{comm.title}</div>
+                      <div className="flex items-center gap-1 text-[10px] text-amber-300/70">
+                        <Calendar className="w-3 h-3" />
+                        跟进时间: {comm.nextFollowUp}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </td>
@@ -134,6 +335,10 @@ export default function Supplier() {
   const skuItems = useInventoryStore((s) => s.skuItems)
   const getSkuWithoutSupplier = useInventoryStore((s) => s.getSkuWithoutSupplier)
   const getWarehouseById = useInventoryStore((s) => s.getWarehouseById)
+  const getSupplierById = useInventoryStore((s) => s.getSupplierById)
+  const getPendingCommunications = useInventoryStore((s) => s.getPendingCommunications)
+  const getCommunicationsBySupplier = useInventoryStore((s) => s.getCommunicationsBySupplier)
+  const getLatestCommunicationBySupplier = useInventoryStore((s) => s.getLatestCommunicationBySupplier)
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -141,6 +346,8 @@ export default function Supplier() {
   const activeCount = useMemo(() => suppliers.filter((s) => s.status === 'active').length, [suppliers])
   const inactiveCount = useMemo(() => suppliers.filter((s) => s.status === 'inactive').length, [suppliers])
   const blacklistedCount = useMemo(() => suppliers.filter((s) => s.status === 'blacklisted').length, [suppliers])
+
+  const pendingCommunications = useMemo(() => getPendingCommunications(), [getPendingCommunications])
 
   const filteredSuppliers = useMemo(() => {
     if (!searchTerm.trim()) return suppliers
@@ -161,6 +368,32 @@ export default function Supplier() {
 
   return (
     <div className="min-h-screen bg-dark-900 p-6 space-y-6 fade-in">
+      <div className="bg-dark-700 border border-dark-500 rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <MessageSquare className="w-5 h-5 text-blue-400" />
+          <h2 className="text-sm font-semibold text-gray-200">待处理沟通汇总</h2>
+          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-medium">
+            {pendingCommunications.length} 项
+          </span>
+        </div>
+        {pendingCommunications.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 text-sm">暂无待处理沟通</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {pendingCommunications.map((comm) => {
+              const supplier = getSupplierById(comm.supplierId)
+              return (
+                <CommCard
+                  key={comm.id}
+                  comm={comm}
+                  supplierName={supplier?.name || '未知供应商'}
+                />
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-dark-700 border border-dark-500 rounded-xl p-5">
           <div className="flex items-center gap-3">
@@ -224,53 +457,80 @@ export default function Supplier() {
                 <th className="text-center px-5 py-3 font-medium">平均交期</th>
                 <th className="text-center px-5 py-3 font-medium">准时率</th>
                 <th className="text-center px-5 py-3 font-medium">覆盖SKU</th>
+                <th className="text-center px-5 py-3 font-medium">最近沟通</th>
+                <th className="text-center px-5 py-3 font-medium">预计到货</th>
               </tr>
             </thead>
             <tbody>
-              {filteredSuppliers.map((sup) => (
-                <>
-                  <tr
-                    key={sup.id}
-                    onClick={() => toggleExpand(sup.id)}
-                    className="border-b border-dark-500 hover:bg-dark-700/60 cursor-pointer transition-colors"
-                  >
-                    <td className="px-5 py-3">
-                      <div className="font-medium text-gray-200">{sup.name}</div>
-                      <div className="text-[10px] text-gray-500 mt-0.5">最近下单: {sup.lastOrderDate}</div>
-                    </td>
-                    <td className="px-5 py-3">{statusBadge(sup.status)}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-1.5 text-gray-300">
-                        <Users className="w-3 h-3 text-gray-500" />
-                        {sup.contactPerson}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-gray-400 mt-0.5">
-                        <Phone className="w-3 h-3 text-gray-500" />
-                        {sup.phone}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-center">
-                      <span className="inline-flex items-center gap-1 text-gray-300">
-                        <Clock className="w-3 h-3 text-gray-500" />
-                        {sup.avgLeadTime}天
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-center">
-                      <span className={`font-semibold ${onTimeRateColor(sup.onTimeRate)}`}>
-                        {(sup.onTimeRate * 100).toFixed(0)}%
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-center">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-dark-600 text-gray-200 text-[11px] font-medium">
-                        {sup.coveredSkuIds.length}
-                      </span>
-                    </td>
-                  </tr>
-                  {expandedId === sup.id && (
-                    <SupplierDetail key={`${sup.id}-detail`} supplier={sup} skuItems={skuItems} />
-                  )}
-                </>
-              ))}
+              {filteredSuppliers.map((sup) => {
+                const latestComm = getLatestCommunicationBySupplier(sup.id)
+                const supplierComms = getCommunicationsBySupplier(sup.id)
+                return (
+                  <>
+                    <tr
+                      key={sup.id}
+                      onClick={() => toggleExpand(sup.id)}
+                      className="border-b border-dark-500 hover:bg-dark-700/60 cursor-pointer transition-colors"
+                    >
+                      <td className="px-5 py-3">
+                        <div className="font-medium text-gray-200">{sup.name}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">最近下单: {sup.lastOrderDate}</div>
+                      </td>
+                      <td className="px-5 py-3">{statusBadge(sup.status)}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-1.5 text-gray-300">
+                          <Users className="w-3 h-3 text-gray-500" />
+                          {sup.contactPerson}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-gray-400 mt-0.5">
+                          <Phone className="w-3 h-3 text-gray-500" />
+                          {sup.phone}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 text-gray-300">
+                          <Clock className="w-3 h-3 text-gray-500" />
+                          {sup.avgLeadTime}天
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <span className={`font-semibold ${onTimeRateColor(sup.onTimeRate)}`}>
+                          {(sup.onTimeRate * 100).toFixed(0)}%
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-dark-600 text-gray-200 text-[11px] font-medium">
+                          {sup.coveredSkuIds.length}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        {latestComm ? (
+                          <span className="text-gray-300">
+                            {new Date(latestComm.lastFollowUp).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        {latestComm?.expectedDeliveryDate ? (
+                          <span className="text-amber-400">{latestComm.expectedDeliveryDate}</span>
+                        ) : (
+                          <span className="text-gray-500">-</span>
+                        )}
+                      </td>
+                    </tr>
+                    {expandedId === sup.id && (
+                      <SupplierDetail
+                        key={`${sup.id}-detail`}
+                        supplier={sup}
+                        skuItems={skuItems}
+                        communications={supplierComms}
+                      />
+                    )}
+                  </>
+                )
+              })}
             </tbody>
           </table>
         </div>
