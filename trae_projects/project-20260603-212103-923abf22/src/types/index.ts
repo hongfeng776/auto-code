@@ -76,3 +76,21 @@ export interface TrendDataPoint {
   replenishmentCount: number
   outOfStockCount: number
 }
+
+export interface SupplierCommunication {
+  id: string
+  supplierId: string
+  skuId: string | null
+  type: 'order_confirm' | 'delivery_update' | 'delay_notice' | 'price_adjust' | 'quality_issue' | 'general'
+  status: 'pending' | 'in_progress' | 'resolved' | 'escalated'
+  title: string
+  content: string
+  contactPerson: string
+  timestamp: string
+  lastFollowUp: string
+  nextFollowUp: string | null
+  expectedDeliveryDate: string | null
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  assignedTo: string
+  relatedOrderId: string | null
+}
