@@ -1,6 +1,6 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { ShoppingCart, AlertTriangle, Check, ChevronRight, DollarSign, Clock, UserX, Layers } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ShoppingCart, AlertTriangle, Check, ChevronRight, DollarSign, Clock, UserX, Layers, X, Pin } from 'lucide-react';
 import { useInventoryStore } from '../../store/inventoryStore';
 
 export const Replenishment: React.FC = () => {
@@ -8,12 +8,24 @@ export const Replenishment: React.FC = () => {
     suggestions, 
     batchMode, 
     selectedSuggestions, 
+    selectedSkuId,
     toggleBatchMode, 
     toggleSuggestion,
     selectAllSuggestions,
     clearSelectedSuggestions,
+    selectSku,
     alertConfig
   } = useInventoryStore();
+  
+  const selectedSuggestionRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    if (selectedSkuId && selectedSuggestionRef.current) {
+      setTimeout(() => {
+        selectedSuggestionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [selectedSkuId]);
 
   const urgentCount = suggestions.filter(s => s.priority === 'urgent').length;
   const highCount = suggestions.filter(s => s.priority === 'high').length;
@@ -52,12 +64,19 @@ export const Replenishment: React.FC = () => {
     }
   };
 
+  const selectedSuggestion = suggestions.find(s => s.skuId === selectedSkuId);
+
   return (
     <motion.div
+      id="replenishment-section"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="bg-dark-400/50 backdrop-blur-sm rounded-xl border border-dark-200 p-5"
+      className={`bg-dark-400/50 backdrop-blur-sm rounded-xl border p-5 transition-all ${
+        selectedSkuId 
+          ? 'border-primary-500/50 glow-primary' 
+          : 'border-dark-200'
+      }`}
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -87,6 +106,33 @@ export const Replenishment: React.FC = () => {
           </button>
         </div>
       </div>
+      
+      <AnimatePresence>
+        {selectedSkuId && selectedSuggestion && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-3 bg-primary-600/20 border border-primary-500/30 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Pin className="w-4 h-4 text-primary-200" />
+                  <span className="text-sm text-primary-200">已定位：</span>
+                  <span className="text-sm font-medium text-white">{selectedSuggestion.skuName}</span>
+                </div>
+                <button
+                  onClick={() => selectSku(null)}
+                  className="p-1 rounded hover:bg-dark-300 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {showBatchWarning && !batchMode && (
         <div className="mb-4 p-3 rounded-lg bg-risk-medium/10 border border-risk-medium/30 flex items-center justify-between">
@@ -145,18 +191,28 @@ export const Replenishment: React.FC = () => {
       )}
 
       <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-        {suggestions.map((suggestion, index) => (
+        {suggestions.map((suggestion, index) => {
+          const isLinkedSku = suggestion.skuId === selectedSkuId;
+          
+          return (
           <motion.div
+            ref={isLinkedSku ? selectedSuggestionRef : null}
             key={suggestion.id}
             initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            animate={{ 
+              opacity: 1, 
+              x: 0,
+              scale: isLinkedSku ? 1.02 : 1,
+            }}
             transition={{ duration: 0.3, delay: index * 0.05 }}
             className={`p-4 rounded-lg border transition-all cursor-pointer ${
-              selectedSuggestions.includes(suggestion.id)
-                ? 'bg-primary-800/30 border-primary-500/50'
-                : suggestion.priority === 'urgent'
-                  ? 'bg-risk-high/5 border-risk-high/30 hover:border-risk-high/50'
-                  : 'bg-dark-300/30 border-dark-200 hover:border-primary-600/50'
+              isLinkedSku
+                ? 'bg-primary-600/30 border-primary-400 ring-2 ring-primary-400/50 glow-primary'
+                : selectedSuggestions.includes(suggestion.id)
+                  ? 'bg-primary-800/30 border-primary-500/50'
+                  : suggestion.priority === 'urgent'
+                    ? 'bg-risk-high/5 border-risk-high/30 hover:border-risk-high/50'
+                    : 'bg-dark-300/30 border-dark-200 hover:border-primary-600/50'
             }`}
             onClick={() => batchMode && toggleSuggestion(suggestion.id)}
           >
@@ -236,7 +292,8 @@ export const Replenishment: React.FC = () => {
               </span>
             </div>
           </motion.div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-4 pt-4 border-t border-dark-200 flex items-center justify-between">

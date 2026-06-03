@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, AlertCircle, CheckCircle, Package, UserX, ChevronDown, ChevronUp, TrendingDown } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle, Package, UserX, ChevronDown, ChevronUp, TrendingDown, ShoppingCart, ArrowRight } from 'lucide-react';
 import { useInventoryStore } from '../../store/inventoryStore';
 import { Sku } from '../../types';
 import { getSupplierById } from '../../data/mockData';
 
 export const SkuRisk: React.FC = () => {
-  const { getFilteredSkus, suppliers } = useInventoryStore();
+  const { getFilteredSkus, suppliers, selectedSkuId, selectSku } = useInventoryStore();
   const [expandedSku, setExpandedSku] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
 
@@ -49,6 +49,15 @@ export const SkuRisk: React.FC = () => {
 
   const SkuDetail = ({ sku }: { sku: Sku }) => {
     const supplier = getSupplierById(sku.supplierId);
+    const isSelected = selectedSkuId === sku.id;
+    
+    const handleViewSuggestion = () => {
+      selectSku(sku.id);
+      const replenishmentElement = document.getElementById('replenishment-section');
+      if (replenishmentElement) {
+        replenishmentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
     
     return (
       <motion.div
@@ -128,6 +137,21 @@ export const SkuRisk: React.FC = () => {
               </div>
             </div>
           )}
+          
+          <div className="mt-3 pt-3 border-t border-dark-200">
+            <button
+              onClick={handleViewSuggestion}
+              className={`w-full py-2 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                isSelected
+                  ? 'bg-primary-600 text-white glow-primary'
+                  : 'bg-primary-600/20 text-primary-200 hover:bg-primary-600/30 border border-primary-500/30'
+              }`}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              {isSelected ? '已选中，查看补货建议' : '查看补货建议'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </motion.div>
     );

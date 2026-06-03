@@ -8,11 +8,13 @@ interface InventoryState {
   suppliers: Supplier[];
   suggestions: ReplenishmentSuggestion[];
   selectedWarehouseId: string | null;
+  selectedSkuId: string | null;
   alertConfig: AlertConfig;
   simulationResults: SimulationResult[];
   batchMode: boolean;
   selectedSuggestions: string[];
   selectWarehouse: (id: string | null) => void;
+  selectSku: (id: string | null) => void;
   getFilteredSkus: () => Sku[];
   toggleBatchMode: () => void;
   toggleSuggestion: (id: string) => void;
@@ -28,6 +30,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   suppliers,
   suggestions: generateReplenishmentSuggestions(),
   selectedWarehouseId: null,
+  selectedSkuId: null,
   alertConfig: {
     highStockThreshold: 3,
     mediumStockThreshold: 7,
@@ -39,6 +42,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   selectedSuggestions: [],
 
   selectWarehouse: (id) => set({ selectedWarehouseId: id }),
+
+  selectSku: (id) => set({ selectedSkuId: id }),
 
   getFilteredSkus: () => {
     const { skus, selectedWarehouseId } = get();
