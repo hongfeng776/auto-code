@@ -2,6 +2,7 @@
 **/dist/
 **/.vite/
 **/.cache/
+trae_projects/
 *.log
 .env
 .env.*
