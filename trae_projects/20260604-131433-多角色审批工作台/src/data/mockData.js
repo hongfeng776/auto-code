@@ -96,7 +96,7 @@ const APPROVAL_NODES = {
   ],
   'APP-2026-002': [
     { id: 'n_002_1', step: 1, roleName: '人事主管', roleId: 'hr', approverName: null, approverId: null, status: 'pending', comment: '', timestamp: '' },
-    { id: 'n_002_2', step: 2, roleName: '部门经理', roleId: 'dept_manager', approverName: '王建国', approverId: 'u_002', status: 'pending', comment: '', timestamp: '' },
+    { id: 'n_002_2', step: 2, roleName: '财务主管', roleId: 'finance', approverName: '刘会计', approverId: 'u_004', status: 'pending', comment: '', timestamp: '' },
     { id: 'n_002_3', step: 3, roleName: '总经理', roleId: 'general_manager', approverName: '陈总', approverId: 'u_010', status: 'pending', comment: '', timestamp: '' },
   ],
   'APP-2026-003': [
@@ -155,7 +155,7 @@ const OPERATION_RECORDS = {
 const TYPE_ROLE_MAPPING = {
   procurement: ['dept_manager', 'finance', 'general_manager'],
   finance: ['dept_manager', 'finance', 'general_manager'],
-  hr: ['hr', 'dept_manager', 'general_manager'],
+  hr: ['hr', 'general_manager'],
 }
 
 export { ROLES, CURRENT_USER, APPLICATIONS, APPROVAL_NODES, OPERATION_RECORDS, TYPE_ROLE_MAPPING }
